@@ -138,6 +138,15 @@ fun NotesScreen(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(14.dp))
+            Button(
+              onClick = { viewModel.openCreateNote() },
+              shape = RoundedCornerShape(12.dp)
+            ) {
+              Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Text("Create First Note")
+            }
           }
         }
       } else {

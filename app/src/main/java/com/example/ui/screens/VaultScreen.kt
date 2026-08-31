@@ -192,11 +192,32 @@ fun VaultScreen(
           Text(
             text = if (localSearchQuery.isNotBlank() || uiState.selectedTagFilter != null)
               "No clips match the selected filters."
+            else if (allClips.isEmpty())
+              "Your vault is empty."
             else
               "No clips in this vault category.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
+          Spacer(modifier = Modifier.height(12.dp))
+          if (localSearchQuery.isNotBlank() || uiState.selectedTagFilter != null) {
+            androidx.compose.material3.OutlinedButton(
+              onClick = {
+                localSearchQuery = ""
+                viewModel.setVaultTagFilter(null)
+              },
+              shape = RoundedCornerShape(12.dp)
+            ) {
+              Text("Clear Filters")
+            }
+          } else if (allClips.isEmpty()) {
+            androidx.compose.material3.Button(
+              onClick = { viewModel.navigateTo(com.example.ui.viewmodel.VaultScreen.CAPTURE) },
+              shape = RoundedCornerShape(12.dp)
+            ) {
+              Text("Capture Your First Clip")
+            }
+          }
         }
       }
     } else {

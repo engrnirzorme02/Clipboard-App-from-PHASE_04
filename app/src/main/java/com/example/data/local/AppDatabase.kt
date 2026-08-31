@@ -10,7 +10,8 @@ import androidx.room.TypeConverters
   entities = [
     ClipEntity::class,
     NoteEntity::class,
-    TagEntity::class
+    TagEntity::class,
+    ClipboardItem::class
   ],
   version = 1,
   exportSchema = false
@@ -20,6 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun clipDao(): ClipDao
   abstract fun noteDao(): NoteDao
   abstract fun tagDao(): TagDao
+  abstract fun clipboardDao(): ClipboardDao
 
   companion object {
     @Volatile

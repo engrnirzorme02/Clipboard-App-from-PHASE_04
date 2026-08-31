@@ -40,11 +40,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class VaultScreen(val title: String) {
-  CAPTURE("Capture"),
   VAULT("Vault"),
+  CAPTURE("Capture"),
   NOTES("Notes"),
   SEARCH("Search"),
-  SETTINGS("Settings")
+  SETTINGS("Settings"),
+  CLIPBOARD("Clipboard")
 }
 
 enum class VaultFilter(val label: String) {
@@ -55,7 +56,7 @@ enum class VaultFilter(val label: String) {
 }
 
 data class VaultUiState(
-  val currentScreen: VaultScreen = VaultScreen.CAPTURE,
+  val currentScreen: VaultScreen = VaultScreen.VAULT,
   val captureInput: String = "",
   val captureTitle: String = "",
   val captureTags: List<String> = emptyList(),
@@ -147,6 +148,63 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
       message = "VaultViewModel ready with profile: ${_uiState.value.environmentConfig.type.displayName}",
       details = "Current role: ${_uiState.value.currentRole.title}"
     )
+
+    viewModelScope.launch {
+      val existing = clipRepository.getAllSnapshot()
+      if (existing.isEmpty()) {
+        clipRepository.insertClips(
+          listOf(
+            ClipItem(
+              title = "Git Commit Template",
+              text = "git commit -m 'feat: implement Room database and Compose LazyColumn'",
+              normalizedHash = "hash_sample_code_1",
+              tags = listOf("code", "git"),
+              source = ClipSource.KEYBOARD,
+              pinned = true,
+              sensitivity = SensitivityLevel.NORMAL
+            ),
+            ClipItem(
+              title = "Android Architecture Guide",
+              text = "https://developer.android.com/topic/architecture/data-layer",
+              normalizedHash = "hash_sample_link_1",
+              tags = listOf("link", "android", "docs"),
+              source = ClipSource.CLIPBOARD,
+              pinned = false,
+              sensitivity = SensitivityLevel.NORMAL
+            ),
+            ClipItem(
+              title = "API Secret Key (Dev)",
+              text = "sk_test_51MzXk098a87b6c5d4e3f2a1z_token",
+              normalizedHash = "hash_sample_secret_1",
+              tags = listOf("secret", "api"),
+              source = ClipSource.KEYBOARD,
+              pinned = false,
+              sensitivity = SensitivityLevel.SENSITIVE
+            ),
+            ClipItem(
+              title = "Welcome to Clipboard Vault",
+              text = "Welcome to your personal Clipboard Vault! You can rapidly capture text, organize with tags, filter sensitive items, convert clips into formatted notes, and export JSON backups.",
+              normalizedHash = "hash_sample_general_1",
+              tags = listOf("guide", "important"),
+              source = ClipSource.KEYBOARD,
+              pinned = false,
+              sensitivity = SensitivityLevel.NORMAL
+            )
+          )
+        )
+      }
+
+      val existingNotes = noteRepository.getAllSnapshot()
+      if (existingNotes.isEmpty()) {
+        noteRepository.insertNote(
+          VaultNote(
+            title = "Getting Started with Vault",
+            content = "1. Use Capture tab or Android Share menu to save text instantly.\n2. Pin important clips to keep them at the top.\n3. Mark items as Sensitive for restricted display.\n4. Use AI Assistant inside Clip Details to summarize or extract action items.",
+            tags = listOf("guide", "notes")
+          )
+        )
+      }
+    }
   }
 
   // Navigation

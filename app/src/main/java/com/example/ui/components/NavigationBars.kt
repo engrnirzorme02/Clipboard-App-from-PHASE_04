@@ -205,8 +205,8 @@ fun BottomVaultNavigation(
     tonalElevation = 6.dp
   ) {
     val items = listOf(
-      Triple(VaultScreen.CAPTURE, Icons.Filled.ContentPaste, Icons.Outlined.ContentPaste),
       Triple(VaultScreen.VAULT, Icons.Filled.Inventory2, Icons.Outlined.Inventory2),
+      Triple(VaultScreen.CAPTURE, Icons.Filled.ContentPaste, Icons.Outlined.ContentPaste),
       Triple(VaultScreen.NOTES, Icons.Filled.EditNote, Icons.Outlined.EditNote),
       Triple(VaultScreen.SEARCH, Icons.Filled.Search, Icons.Outlined.Search),
       Triple(VaultScreen.SETTINGS, Icons.Filled.Settings, Icons.Outlined.Settings)

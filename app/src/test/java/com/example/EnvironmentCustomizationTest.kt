@@ -153,4 +153,39 @@ class EnvironmentCustomizationTest {
     assertEquals(1, staleItems.size)
     assertEquals(staleUnpinnedClip.id, staleItems[0].id)
   }
+
+  @Test
+  fun testClipboardItemModelAndFormatting() {
+    val timestamp = 1756656000000L
+    val item = com.example.data.local.ClipboardItem(
+      id = 1L,
+      content = "https://example.com/api",
+      timestamp = timestamp,
+      category = "Link"
+    )
+
+    assertEquals(1L, item.id)
+    assertEquals("https://example.com/api", item.content)
+    assertEquals("Link", item.category)
+    assertTrue(item.formattedTimestamp.isNotBlank())
+  }
+
+  @Test
+  fun testClipboardFilteringLogic() {
+    val items = listOf(
+      com.example.data.local.ClipboardItem(id = 1, content = "val x = 10", category = "Code"),
+      com.example.data.local.ClipboardItem(id = 2, content = "Meeting at 5pm", category = "Note"),
+      com.example.data.local.ClipboardItem(id = 3, content = "https://github.com", category = "Link")
+    )
+
+    // Filter by search query "github"
+    val searchFiltered = items.filter { it.content.contains("github", ignoreCase = true) }
+    assertEquals(1, searchFiltered.size)
+    assertEquals(3L, searchFiltered[0].id)
+
+    // Filter by category "Code"
+    val categoryFiltered = items.filter { it.category.equals("Code", ignoreCase = true) }
+    assertEquals(1, categoryFiltered.size)
+    assertEquals("val x = 10", categoryFiltered[0].content)
+  }
 }
