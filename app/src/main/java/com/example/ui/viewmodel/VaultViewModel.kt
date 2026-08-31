@@ -591,6 +591,87 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     return DiagnosticLogger.exportLogsAsJson()
   }
 
+  // Plain Text Export for Easy Portability
+  suspend fun exportVaultAsPlainText(): String {
+    val clips = clipRepository.getAllSnapshot()
+    val notes = noteRepository.getAllSnapshot()
+    val clipboardItems = database.clipboardDao().getAllClipboardItemsSnapshot()
+
+    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+
+    val sb = StringBuilder()
+    sb.append("====================================================\n")
+    sb.append("      CLIPBOARD VAULT - COMPLETE TEXT EXPORT        \n")
+    sb.append("Exported: ${dateFormat.format(java.util.Date())}\n")
+    sb.append("Summary: ${clips.size} clips, ${clipboardItems.size} clipboard entries, ${notes.size} notes\n")
+    sb.append("====================================================\n\n")
+
+    if (clipboardItems.isNotEmpty()) {
+      sb.append("=== CAPTURED CLIPBOARD ENTRIES (${clipboardItems.size}) ===\n\n")
+      clipboardItems.forEachIndexed { i, item ->
+        sb.append("[Item ${i + 1}] Category: ${item.category} | Date: ${item.formattedTimestamp}\n")
+        if (item.tags.isNotEmpty()) {
+          sb.append("Tags: #${item.tags.joinToString(" #")}\n")
+        }
+        if (item.isPinned) {
+          sb.append("Status: [PINNED]\n")
+        }
+        sb.append("Content:\n${item.content}\n\n----------------------------------------------------\n\n")
+      }
+    }
+
+    if (clips.isNotEmpty()) {
+      sb.append("=== VAULT CLIPS (${clips.size}) ===\n\n")
+      clips.forEachIndexed { i, clip ->
+        sb.append("[Clip ${i + 1}] Code: ${clip.shortCode} | Title: ${clip.title ?: "Untitled"}\n")
+        if (clip.tags.isNotEmpty()) {
+          sb.append("Tags: #${clip.tags.joinToString(" #")}\n")
+        }
+        sb.append("Created: ${dateFormat.format(java.util.Date(clip.createdAt))} | Source: ${clip.source.name}\n")
+        sb.append("Text:\n${clip.text}\n\n----------------------------------------------------\n\n")
+      }
+    }
+
+    if (notes.isNotEmpty()) {
+      sb.append("=== VAULT NOTES (${notes.size}) ===\n\n")
+      notes.forEachIndexed { i, note ->
+        sb.append("[Note ${i + 1}] Title: ${note.title}\n")
+        if (note.tags.isNotEmpty()) {
+          sb.append("Tags: #${note.tags.joinToString(" #")}\n")
+        }
+        sb.append("Content:\n${note.content}\n\n----------------------------------------------------\n\n")
+      }
+    }
+
+    return sb.toString()
+  }
+
+  // WorkManager Encrypted Periodic Database Export
+  val encryptedBackupStatus = com.example.service.DatabaseBackupScheduler.statusFlow
+
+  fun refreshEncryptedBackupStatus() {
+    com.example.service.DatabaseBackupScheduler.refreshStatus(getApplication())
+  }
+
+  fun setPeriodicEncryptedBackup(enabled: Boolean, intervalHours: Long = 6) {
+    com.example.service.DatabaseBackupScheduler.setAutoBackupEnabled(getApplication(), enabled, intervalHours)
+    showSnackbar(if (enabled) "Scheduled periodic AES-256 encrypted Room DB export (every ${intervalHours}h)" else "Periodic database backup disabled")
+  }
+
+  fun triggerImmediateEncryptedBackup() {
+    com.example.service.DatabaseBackupScheduler.triggerImmediateEncryptedBackup(getApplication())
+    showSnackbar("Encrypted Room DB export task queued in WorkManager")
+    viewModelScope.launch {
+      kotlinx.coroutines.delay(1000)
+      refreshEncryptedBackupStatus()
+    }
+  }
+
+  fun setCustomBackupDirectory(path: String) {
+    com.example.service.DatabaseBackupScheduler.setCustomExportDirectory(getApplication(), path)
+    showSnackbar("Custom backup location updated")
+  }
+
   // Backup & Restore
   suspend fun generateBackupJson(): String {
     DiagnosticLogger.log(

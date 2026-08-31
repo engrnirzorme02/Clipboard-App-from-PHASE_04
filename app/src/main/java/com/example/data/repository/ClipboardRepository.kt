@@ -14,6 +14,33 @@ class ClipboardRepository(private val clipboardDao: ClipboardDao) {
 
   fun getItemById(id: Long): Flow<ClipboardItem?> = clipboardDao.getClipboardItemById(id)
 
+  suspend fun getAllSnapshot(): List<ClipboardItem> = clipboardDao.getAllClipboardItemsSnapshot()
+
+  suspend fun exportToPlainText(): String {
+    val items = getAllSnapshot()
+    val sb = StringBuilder()
+    sb.append("====================================================\n")
+    sb.append("          CLIPBOARD VAULT - TEXT EXPORT             \n")
+    sb.append("Exported on: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}\n")
+    sb.append("Total Items: ${items.size}\n")
+    sb.append("====================================================\n\n")
+
+    items.forEachIndexed { index, item ->
+      sb.append("--- [${index + 1}] -----------------------------------\n")
+      sb.append("ID: ${item.id}\n")
+      sb.append("Date: ${item.formattedTimestamp}\n")
+      sb.append("Category: ${item.category}\n")
+      if (item.tags.isNotEmpty()) {
+        sb.append("Tags: #${item.tags.joinToString(" #")}\n")
+      }
+      if (item.isPinned) {
+        sb.append("Status: [PINNED]\n")
+      }
+      sb.append("\n${item.content}\n\n")
+    }
+    return sb.toString()
+  }
+
   suspend fun insert(item: ClipboardItem): Long = clipboardDao.insertClipboardItem(item)
 
   suspend fun insertAll(items: List<ClipboardItem>) = clipboardDao.insertClipboardItems(items)

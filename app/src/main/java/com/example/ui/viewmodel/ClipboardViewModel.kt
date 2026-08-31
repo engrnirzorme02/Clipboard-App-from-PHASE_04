@@ -11,6 +11,7 @@ import com.example.data.local.ClipboardItem
 import com.example.data.repository.ClipboardRepository
 import com.example.service.ClipboardMonitorService
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,13 +23,17 @@ import kotlinx.coroutines.launch
 data class ClipboardUiState(
   val searchQuery: String = "",
   val selectedCategory: String? = null,
+  val selectedTag: String? = null,
   val contentInput: String = "",
   val categoryInput: String = "General",
+  val tagsInput: String = "",
   val editingItem: ClipboardItem? = null,
   val isAddCardExpanded: Boolean = false,
   val isMonitoringActive: Boolean = false,
   val lastDeletedItem: ClipboardItem? = null,
-  val snackbarMessage: String? = null
+  val snackbarMessage: String? = null,
+  val isExportingPlainText: Boolean = false,
+  val exportedPlainText: String? = null
 )
 
 class ClipboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -42,12 +47,23 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
   private val _selectedCategory = MutableStateFlow<String?>(null)
   val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
+  private val _selectedTag = MutableStateFlow<String?>(null)
+  val selectedTag: StateFlow<String?> = _selectedTag.asStateFlow()
+
   private val _uiState = MutableStateFlow(
     ClipboardUiState(isMonitoringActive = ClipboardMonitorService.isServiceRunning)
   )
   val uiState: StateFlow<ClipboardUiState> = _uiState.asStateFlow()
 
   val allItems: StateFlow<List<ClipboardItem>> = repository.allClipboardItems.stateIn(
+    scope = viewModelScope,
+    started = SharingStarted.WhileSubscribed(5000),
+    initialValue = emptyList()
+  )
+
+  val allTags: StateFlow<List<String>> = repository.allClipboardItems.map { items ->
+    items.flatMap { it.tags }.distinct().sorted()
+  }.stateIn(
     scope = viewModelScope,
     started = SharingStarted.WhileSubscribed(5000),
     initialValue = emptyList()
@@ -65,31 +81,36 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
               content = "git commit -m 'feat: implement Room database and ClipboardViewModel with Compose LazyColumn'",
               category = "Code",
               timestamp = System.currentTimeMillis() - 600000,
-              isPinned = true
+              isPinned = true,
+              tags = listOf("git", "terminal", "workflow")
             ),
             ClipboardItem(
               content = "https://developer.android.com/training/data-storage/room",
               category = "Link",
               timestamp = System.currentTimeMillis() - 3600000,
-              isPinned = true
+              isPinned = true,
+              tags = listOf("docs", "android", "room")
             ),
             ClipboardItem(
               content = "Meeting agenda: Discuss offline-first Room database migration and search indexing.",
               category = "Note",
               timestamp = System.currentTimeMillis() - 7200000,
-              isPinned = false
+              isPinned = false,
+              tags = listOf("meeting", "work")
             ),
             ClipboardItem(
               content = "auth-token-prod-2026-xyz-encrypted-key",
               category = "Password",
               timestamp = System.currentTimeMillis() - 14400000,
-              isPinned = false
+              isPinned = false,
+              tags = listOf("security", "tokens")
             ),
             ClipboardItem(
-              content = "Welcome to Clipboard Vault! You can search clips, filter by category, pin important items, swipe to delete, and auto-capture with the background service.",
+              content = "Welcome to Clipboard Vault! You can search clips, filter by category and custom tags, pin important items, swipe to delete, and auto-capture with the background service.",
               category = "General",
               timestamp = System.currentTimeMillis() - 86400000,
-              isPinned = false
+              isPinned = false,
+              tags = listOf("guide", "intro")
             )
           )
         )
@@ -97,21 +118,26 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
-  // Combine items, search query, and category filter for reactive filtering
+  // Combine items, search query, category, and tag filter for reactive filtering
   val filteredItems: StateFlow<List<ClipboardItem>> = combine(
     repository.allClipboardItems,
     _searchQuery,
-    _selectedCategory
-  ) { items, query, category ->
+    _selectedCategory,
+    _selectedTag
+  ) { items, query, category, tag ->
     items.filter { item ->
       val matchesQuery = query.isBlank() ||
         item.content.contains(query, ignoreCase = true) ||
-        item.category.contains(query, ignoreCase = true)
+        item.category.contains(query, ignoreCase = true) ||
+        item.tags.any { it.contains(query, ignoreCase = true) }
 
       val matchesCategory = category == null || category == "All" ||
         item.category.equals(category, ignoreCase = true)
 
-      matchesQuery && matchesCategory
+      val matchesTag = tag == null || tag == "All" ||
+        item.tags.any { it.equals(tag, ignoreCase = true) }
+
+      matchesQuery && matchesCategory && matchesTag
     }
   }.stateIn(
     scope = viewModelScope,
@@ -130,6 +156,12 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
     _uiState.value = _uiState.value.copy(selectedCategory = effectiveCategory)
   }
 
+  fun setSelectedTag(tag: String?) {
+    val effectiveTag = if (tag == "All") null else tag
+    _selectedTag.value = effectiveTag
+    _uiState.value = _uiState.value.copy(selectedTag = effectiveTag)
+  }
+
   fun setContentInput(text: String) {
     val autoCat = if (_uiState.value.categoryInput == "General" && text.isNotBlank()) {
       ClipboardItem.inferCategory(text)
@@ -141,6 +173,10 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun setCategoryInput(category: String) {
     _uiState.value = _uiState.value.copy(categoryInput = category)
+  }
+
+  fun setTagsInput(tags: String) {
+    _uiState.value = _uiState.value.copy(tagsInput = tags)
   }
 
   fun setAddCardExpanded(expanded: Boolean) {
@@ -169,12 +205,15 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun addOrUpdateClipboardItem(
     content: String = _uiState.value.contentInput,
-    category: String = _uiState.value.categoryInput
+    category: String = _uiState.value.categoryInput,
+    tagsString: String = _uiState.value.tagsInput
   ) {
     if (content.isBlank()) {
       showSnackbar("Content cannot be empty")
       return
     }
+
+    val parsedTags = ClipboardItem.parseTags(tagsString)
 
     viewModelScope.launch {
       val editing = _uiState.value.editingItem
@@ -182,12 +221,14 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
         val updated = editing.copy(
           content = content.trim(),
           category = category.trim().ifBlank { ClipboardItem.inferCategory(content) },
+          tags = parsedTags,
           timestamp = System.currentTimeMillis()
         )
         repository.update(updated)
         _uiState.value = _uiState.value.copy(
           contentInput = "",
           categoryInput = "General",
+          tagsInput = "",
           editingItem = null,
           isAddCardExpanded = false,
           snackbarMessage = "Clipboard item updated"
@@ -196,6 +237,7 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
         val newItem = ClipboardItem(
           content = content.trim(),
           category = category.trim().ifBlank { ClipboardItem.inferCategory(content) },
+          tags = parsedTags,
           timestamp = System.currentTimeMillis(),
           isPinned = false
         )
@@ -203,6 +245,7 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(
           contentInput = "",
           categoryInput = "General",
+          tagsInput = "",
           isAddCardExpanded = false,
           snackbarMessage = "Item saved to Clipboard Database"
         )
@@ -260,6 +303,7 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
       editingItem = item,
       contentInput = item.content,
       categoryInput = item.category,
+      tagsInput = item.tags.joinToString(", "),
       isAddCardExpanded = true
     )
   }
@@ -269,8 +313,13 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
       editingItem = null,
       contentInput = "",
       categoryInput = "General",
+      tagsInput = "",
       isAddCardExpanded = false
     )
+  }
+
+  suspend fun generatePlainTextExport(): String {
+    return repository.exportToPlainText()
   }
 
   fun showSnackbar(message: String) {

@@ -31,8 +31,12 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import android.content.Intent
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.firebase.CloudSyncState
 import com.example.data.firebase.FirebaseSyncStatus
@@ -69,6 +73,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,6 +85,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -112,10 +119,16 @@ fun SettingsScreen(
 
   var showExportDialog by remember { mutableStateOf(false) }
   var exportedJsonText by remember { mutableStateOf("") }
+  var showPlainTextExportDialog by remember { mutableStateOf(false) }
+  var plainTextExportContent by remember { mutableStateOf("") }
+  var showLocationCustomDialog by remember { mutableStateOf(false) }
+  var customLocationInput by remember { mutableStateOf("") }
   var showImportDialog by remember { mutableStateOf(false) }
   var importInputJson by remember { mutableStateOf("") }
   var selectedImportStrategy by remember { mutableStateOf(DuplicateStrategy.SKIP_DUPLICATES) }
   var showWipeConfirmDialog by remember { mutableStateOf(false) }
+
+  val encryptedBackupStatus by viewModel.encryptedBackupStatus.collectAsStateWithLifecycle()
 
   Column(
     modifier = modifier
@@ -605,7 +618,192 @@ fun SettingsScreen(
 
     Spacer(modifier = Modifier.height(16.dp))
 
-    // 6. JSON Backup & Restore Card
+    // 6. Plain Text File Format Export Card for Easy Portability
+    Card(
+      modifier = Modifier
+        .fillMaxWidth()
+        .testTag("plain_text_export_card"),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+      Column(modifier = Modifier.padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Default.Description, contentDescription = null, tint = VaultEmerald)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text("Plain Text Export & Portability", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+          text = "Export all captured clipboard items, notes, and tags into a clean plain text (.txt) format for easy sharing, backup, or copy-pasting to any desktop/external editor.",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Button(
+          onClick = {
+            scope.launch {
+              plainTextExportContent = viewModel.exportVaultAsPlainText()
+              showPlainTextExportDialog = true
+            }
+          },
+          shape = RoundedCornerShape(12.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = VaultEmerald),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("export_plain_text_button")
+        ) {
+          Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(modifier = Modifier.width(8.dp))
+          Text("Export as Plain Text (.txt)")
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // 7. WorkManager Periodic AES-256 Encrypted Database Export Card
+    Card(
+      modifier = Modifier
+        .fillMaxWidth()
+        .testTag("workmanager_encryption_card"),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+      Column(modifier = Modifier.padding(16.dp)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = VaultCyan)
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+              Text("Encrypted DB Export (WorkManager)", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+              Text("AES-256 GCM Automated Encryption", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+          }
+
+          Switch(
+            checked = encryptedBackupStatus.isAutoBackupEnabled,
+            onCheckedChange = { isEnabled ->
+              viewModel.setPeriodicEncryptedBackup(isEnabled, encryptedBackupStatus.intervalHours)
+            },
+            colors = SwitchDefaults.colors(
+              checkedThumbColor = VaultCyan,
+              checkedTrackColor = VaultCyan.copy(alpha = 0.35f)
+            ),
+            modifier = Modifier.testTag("workmanager_autobackup_switch")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Interval selector chips
+        Text(
+          text = "Periodic Backup Schedule:",
+          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          listOf(3L to "3h", 6L to "6h", 12L to "12h", 24L to "24h").forEach { (hours, label) ->
+            val isSelected = encryptedBackupStatus.intervalHours == hours
+            FilterChip(
+              selected = isSelected,
+              onClick = {
+                viewModel.setPeriodicEncryptedBackup(encryptedBackupStatus.isAutoBackupEnabled, hours)
+              },
+              label = { Text("Every $label", style = MaterialTheme.typography.labelSmall) },
+              modifier = Modifier.weight(1f),
+              colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.primary
+              )
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Status Card
+        Surface(
+          shape = RoundedCornerShape(10.dp),
+          color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Box(
+                modifier = Modifier
+                  .size(8.dp)
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(if (encryptedBackupStatus.lastStatus.contains("SUCCESS")) VaultEmerald else VaultAmber)
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = "Last Export: ${encryptedBackupStatus.formattedLastBackup}",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+              )
+            }
+            Text("Payload Size: ${encryptedBackupStatus.lastBackupSize} • ${encryptedBackupStatus.totalItemsBackedUp} items exported", style = MaterialTheme.typography.labelSmall)
+            Text("Algorithm: AES-256 GCM with SHA-256 Key Derivation", style = MaterialTheme.typography.labelSmall, color = VaultCyan)
+            Text(
+              text = if (encryptedBackupStatus.customLocationPath.isNotBlank())
+                "Secure Target: ${encryptedBackupStatus.customLocationPath}"
+              else
+                "Secure Target: Internal App Secure Storage",
+              style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          OutlinedButton(
+            onClick = {
+              customLocationInput = encryptedBackupStatus.customLocationPath
+              showLocationCustomDialog = true
+            },
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.weight(1f)
+          ) {
+            Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Target Location", style = MaterialTheme.typography.labelSmall)
+          }
+
+          Button(
+            onClick = { viewModel.triggerImmediateEncryptedBackup() },
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+              .weight(1f)
+              .testTag("trigger_encrypted_backup_button")
+          ) {
+            Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Encrypt & Save", style = MaterialTheme.typography.labelSmall)
+          }
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // 8. JSON Backup & Restore Card
     Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(16.dp),
@@ -708,6 +906,150 @@ fun SettingsScreen(
     }
 
     Spacer(modifier = Modifier.height(32.dp))
+  }
+
+  // Plain Text Export Modal Bottom Sheet
+  if (showPlainTextExportDialog) {
+    ModalBottomSheet(
+      onDismissRequest = { showPlainTextExportDialog = false },
+      containerColor = MaterialTheme.colorScheme.surface
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 20.dp)
+          .padding(bottom = 32.dp)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Description, contentDescription = null, tint = VaultEmerald)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Plain Text Vault Export", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+          }
+          Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = VaultEmerald.copy(alpha = 0.15f)
+          ) {
+            Text(
+              text = ".TXT FORMAT",
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = VaultEmerald),
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+          text = "Clean plain text export containing all captured clipboard items, clips, and notes.",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Surface(
+          shape = RoundedCornerShape(12.dp),
+          color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp)
+        ) {
+          Text(
+            text = plainTextExportContent,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+            modifier = Modifier
+              .padding(12.dp)
+              .verticalScroll(rememberScrollState())
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.End
+        ) {
+          OutlinedButton(onClick = { showPlainTextExportDialog = false }) {
+            Text("Close")
+          }
+          Spacer(modifier = Modifier.width(8.dp))
+          OutlinedButton(
+            onClick = {
+              val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Clipboard Vault Export")
+                putExtra(Intent.EXTRA_TEXT, plainTextExportContent)
+              }
+              context.startActivity(Intent.createChooser(shareIntent, "Share Plain Text Export"))
+            }
+          ) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Share")
+          }
+          Spacer(modifier = Modifier.width(8.dp))
+          Button(
+            onClick = {
+              val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+              clipboard.setPrimaryClip(ClipData.newPlainText("Vault Text Export", plainTextExportContent))
+              viewModel.showSnackbar("Plain text export copied to clipboard!")
+              showPlainTextExportDialog = false
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = VaultEmerald)
+          ) {
+            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Copy Text")
+          }
+        }
+      }
+    }
+  }
+
+  // Custom Backup Target Location Dialog
+  if (showLocationCustomDialog) {
+    AlertDialog(
+      onDismissRequest = { showLocationCustomDialog = false },
+      icon = { Icon(Icons.Default.Folder, contentDescription = null, tint = VaultCyan) },
+      title = { Text("Secure Export Location") },
+      text = {
+        Column {
+          Text(
+            text = "Specify a custom absolute directory path on device storage for encrypted WorkManager backups, or leave empty to use secure internal app storage.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+          Spacer(modifier = Modifier.height(10.dp))
+          OutlinedTextField(
+            value = customLocationInput,
+            onValueChange = { customLocationInput = it },
+            placeholder = { Text("e.g. /storage/emulated/0/Download/VaultBackups") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            singleLine = true
+          )
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            viewModel.setCustomBackupDirectory(customLocationInput)
+            showLocationCustomDialog = false
+          }
+        ) {
+          Text("Save Location")
+        }
+      },
+      dismissButton = {
+        OutlinedButton(onClick = { showLocationCustomDialog = false }) {
+          Text("Cancel")
+        }
+      }
+    )
   }
 
   // Export Dialog / Bottom Sheet

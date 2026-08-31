@@ -14,7 +14,8 @@ data class ClipboardItem(
   val content: String,
   val timestamp: Long = System.currentTimeMillis(),
   val category: String = "General",
-  val isPinned: Boolean = false
+  val isPinned: Boolean = false,
+  val tags: List<String> = emptyList()
 ) {
   val formattedTimestamp: String
     get() {
@@ -31,6 +32,15 @@ data class ClipboardItem(
       "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$",
       Pattern.CASE_INSENSITIVE
     )
+
+    fun parseTags(input: String): List<String> {
+      if (input.isBlank()) return emptyList()
+      return input
+        .split(",", " ", "#", ";")
+        .map { it.trim().lowercase().removePrefix("#") }
+        .filter { it.isNotBlank() }
+        .distinct()
+    }
 
     fun inferCategory(text: String): String {
       val trimmed = text.trim()

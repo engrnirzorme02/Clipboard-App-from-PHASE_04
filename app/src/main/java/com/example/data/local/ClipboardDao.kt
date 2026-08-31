@@ -20,10 +20,14 @@ interface ClipboardDao {
   @Query("SELECT * FROM clipboard_items WHERE content = :content LIMIT 1")
   suspend fun getItemByContent(content: String): ClipboardItem?
 
+  @Query("SELECT * FROM clipboard_items ORDER BY isPinned DESC, timestamp DESC")
+  suspend fun getAllClipboardItemsSnapshot(): List<ClipboardItem>
+
   @Query("""
     SELECT * FROM clipboard_items 
     WHERE content LIKE '%' || :query || '%' 
        OR category LIKE '%' || :query || '%' 
+       OR tags LIKE '%' || :query || '%' 
     ORDER BY isPinned DESC, timestamp DESC
   """)
   fun searchClipboardItems(query: String): Flow<List<ClipboardItem>>

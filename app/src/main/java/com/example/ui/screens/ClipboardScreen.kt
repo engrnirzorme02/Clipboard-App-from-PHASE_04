@@ -214,6 +214,56 @@ fun ClipboardScreen(
       }
     }
 
+    // 3.5. Custom Tag-Filtering Bar
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    if (allTags.isNotEmpty()) {
+      Spacer(modifier = Modifier.height(6.dp))
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .horizontalScroll(rememberScrollState())
+          .testTag("tag_filter_bar"),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = "Tags:",
+          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(end = 2.dp)
+        )
+
+        val isAllTagsSelected = uiState.selectedTag == null
+        FilterChip(
+          selected = isAllTagsSelected,
+          onClick = { viewModel.setSelectedTag(null) },
+          label = { Text("All Tags", style = MaterialTheme.typography.labelSmall) },
+          colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.secondary
+          ),
+          shape = RoundedCornerShape(8.dp)
+        )
+
+        allTags.forEach { tag ->
+          val isTagSelected = uiState.selectedTag.equals(tag, ignoreCase = true)
+          FilterChip(
+            selected = isTagSelected,
+            onClick = {
+              viewModel.setSelectedTag(if (isTagSelected) null else tag)
+            },
+            label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
+            colors = FilterChipDefaults.filterChipColors(
+              selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+              selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
+            ),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.testTag("tag_chip_$tag")
+          )
+        }
+      }
+    }
+
     Spacer(modifier = Modifier.height(10.dp))
 
     // 4. Quick-Add / Paste / Edit Clipboard Item Card
@@ -290,6 +340,20 @@ fun ClipboardScreen(
               modifier = Modifier
                 .fillMaxWidth()
                 .testTag("clipboard_category_input"),
+              shape = RoundedCornerShape(12.dp),
+              singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+              value = uiState.tagsInput,
+              onValueChange = { viewModel.setTagsInput(it) },
+              label = { Text("Custom Tags (comma or space separated)") },
+              placeholder = { Text("e.g. git, android, work, important") },
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("clipboard_tags_input"),
               shape = RoundedCornerShape(12.dp),
               singleLine = true
             )
@@ -565,6 +629,30 @@ fun ClipboardItemCard(
         maxLines = 6,
         overflow = TextOverflow.Ellipsis
       )
+
+      if (item.tags.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+          horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+          item.tags.forEach { tag ->
+            Surface(
+              shape = RoundedCornerShape(6.dp),
+              color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+            ) {
+              Text(
+                text = "#$tag",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+              )
+            }
+          }
+        }
+      }
 
       Spacer(modifier = Modifier.height(8.dp))
 
