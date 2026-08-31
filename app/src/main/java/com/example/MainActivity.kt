@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.domain.model.ClipSource
+import com.example.service.ClipboardObserver
 import com.example.ui.components.BottomVaultNavigation
 import com.example.ui.components.TopVaultBar
 import com.example.ui.screens.CaptureScreen
@@ -44,6 +45,12 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+
+    val clipboardObserver = ClipboardObserver(this) { capturedText ->
+      val preview = if (capturedText.length > 30) "${capturedText.take(30)}..." else capturedText
+      clipboardViewModel.showSnackbar("Auto-captured: \"$preview\"")
+    }
+    lifecycle.addObserver(clipboardObserver)
 
     handleIncomingShareIntent(intent)
 

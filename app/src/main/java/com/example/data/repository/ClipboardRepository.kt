@@ -20,6 +20,30 @@ class ClipboardRepository(private val clipboardDao: ClipboardDao) {
 
   suspend fun update(item: ClipboardItem) = clipboardDao.updateClipboardItem(item)
 
+  suspend fun togglePin(item: ClipboardItem) {
+    clipboardDao.updatePinStatus(item.id, !item.isPinned)
+  }
+
+  suspend fun captureNewClipboardText(text: String, customCategory: String? = null): ClipboardItem {
+    val trimmed = text.trim()
+    val category = customCategory ?: ClipboardItem.inferCategory(trimmed)
+    val existing = clipboardDao.getItemByContent(trimmed)
+    return if (existing != null) {
+      val updated = existing.copy(timestamp = System.currentTimeMillis())
+      clipboardDao.updateClipboardItem(updated)
+      updated
+    } else {
+      val newItem = ClipboardItem(
+        content = trimmed,
+        category = category,
+        timestamp = System.currentTimeMillis(),
+        isPinned = false
+      )
+      val newId = clipboardDao.insertClipboardItem(newItem)
+      newItem.copy(id = newId)
+    }
+  }
+
   suspend fun delete(item: ClipboardItem) = clipboardDao.deleteClipboardItem(item)
 
   suspend fun deleteById(id: Long) = clipboardDao.deleteClipboardItemById(id)

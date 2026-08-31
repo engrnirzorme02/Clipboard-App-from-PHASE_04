@@ -56,7 +56,7 @@ enum class VaultFilter(val label: String) {
 }
 
 data class VaultUiState(
-  val currentScreen: VaultScreen = VaultScreen.VAULT,
+  val currentScreen: VaultScreen = VaultScreen.CLIPBOARD,
   val captureInput: String = "",
   val captureTitle: String = "",
   val captureTags: List<String> = emptyList(),

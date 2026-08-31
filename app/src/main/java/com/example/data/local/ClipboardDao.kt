@@ -11,21 +11,24 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ClipboardDao {
 
-  @Query("SELECT * FROM clipboard_items ORDER BY timestamp DESC")
+  @Query("SELECT * FROM clipboard_items ORDER BY isPinned DESC, timestamp DESC")
   fun getAllClipboardItems(): Flow<List<ClipboardItem>>
 
   @Query("SELECT * FROM clipboard_items WHERE id = :id LIMIT 1")
   fun getClipboardItemById(id: Long): Flow<ClipboardItem?>
 
+  @Query("SELECT * FROM clipboard_items WHERE content = :content LIMIT 1")
+  suspend fun getItemByContent(content: String): ClipboardItem?
+
   @Query("""
     SELECT * FROM clipboard_items 
     WHERE content LIKE '%' || :query || '%' 
        OR category LIKE '%' || :query || '%' 
-    ORDER BY timestamp DESC
+    ORDER BY isPinned DESC, timestamp DESC
   """)
   fun searchClipboardItems(query: String): Flow<List<ClipboardItem>>
 
-  @Query("SELECT * FROM clipboard_items WHERE category = :category ORDER BY timestamp DESC")
+  @Query("SELECT * FROM clipboard_items WHERE category = :category ORDER BY isPinned DESC, timestamp DESC")
   fun getClipboardItemsByCategory(category: String): Flow<List<ClipboardItem>>
 
   @Query("SELECT DISTINCT category FROM clipboard_items ORDER BY category ASC")
@@ -40,6 +43,9 @@ interface ClipboardDao {
   @Update
   suspend fun updateClipboardItem(item: ClipboardItem)
 
+  @Query("UPDATE clipboard_items SET isPinned = :isPinned WHERE id = :id")
+  suspend fun updatePinStatus(id: Long, isPinned: Boolean)
+
   @Delete
   suspend fun deleteClipboardItem(item: ClipboardItem)
 
@@ -49,3 +55,4 @@ interface ClipboardDao {
   @Query("DELETE FROM clipboard_items")
   suspend fun clearAllClipboardItems()
 }
+

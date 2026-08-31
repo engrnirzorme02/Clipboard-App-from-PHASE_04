@@ -188,4 +188,27 @@ class EnvironmentCustomizationTest {
     assertEquals(1, categoryFiltered.size)
     assertEquals("val x = 10", categoryFiltered[0].content)
   }
+
+  @Test
+  fun testAutoCategoryInference() {
+    assertEquals("Link", com.example.data.local.ClipboardItem.inferCategory("https://kotlinlang.org"))
+    assertEquals("Contact", com.example.data.local.ClipboardItem.inferCategory("user@example.com"))
+    assertEquals("Code", com.example.data.local.ClipboardItem.inferCategory("fun calculateTotal(): Int = 42"))
+    assertEquals("Password", com.example.data.local.ClipboardItem.inferCategory("aB9_secret_token_12345"))
+    assertEquals("General", com.example.data.local.ClipboardItem.inferCategory("Hello World"))
+  }
+
+  @Test
+  fun testPinnedItemSortingPriority() {
+    val items = listOf(
+      com.example.data.local.ClipboardItem(id = 1, content = "Older Normal Item", timestamp = 1000L, isPinned = false),
+      com.example.data.local.ClipboardItem(id = 2, content = "Newer Normal Item", timestamp = 3000L, isPinned = false),
+      com.example.data.local.ClipboardItem(id = 3, content = "Old Pinned Item", timestamp = 500L, isPinned = true)
+    )
+
+    val sorted = items.sortedWith(compareByDescending<com.example.data.local.ClipboardItem> { it.isPinned }.thenByDescending { it.timestamp })
+    assertEquals(3L, sorted[0].id) // Pinned item is first
+    assertEquals(2L, sorted[1].id) // Newer non-pinned item second
+    assertEquals(1L, sorted[2].id) // Older non-pinned item third
+  }
 }

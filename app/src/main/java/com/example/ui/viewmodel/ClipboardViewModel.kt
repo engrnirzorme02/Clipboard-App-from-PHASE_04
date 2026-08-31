@@ -1,11 +1,15 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.ClipboardItem
 import com.example.data.repository.ClipboardRepository
+import com.example.service.ClipboardMonitorService
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +26,8 @@ data class ClipboardUiState(
   val categoryInput: String = "General",
   val editingItem: ClipboardItem? = null,
   val isAddCardExpanded: Boolean = false,
+  val isMonitoringActive: Boolean = false,
+  val lastDeletedItem: ClipboardItem? = null,
   val snackbarMessage: String? = null
 )
 
@@ -36,7 +42,9 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
   private val _selectedCategory = MutableStateFlow<String?>(null)
   val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
-  private val _uiState = MutableStateFlow(ClipboardUiState())
+  private val _uiState = MutableStateFlow(
+    ClipboardUiState(isMonitoringActive = ClipboardMonitorService.isServiceRunning)
+  )
   val uiState: StateFlow<ClipboardUiState> = _uiState.asStateFlow()
 
   val allItems: StateFlow<List<ClipboardItem>> = repository.allClipboardItems.stateIn(
@@ -45,7 +53,7 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
     initialValue = emptyList()
   )
 
-  val predefinedCategories = listOf("All", "General", "Code", "Link", "Note", "Password", "Snippets")
+  val predefinedCategories = listOf("All", "General", "Code", "Link", "Note", "Password", "Contact", "Snippets")
 
   init {
     viewModelScope.launch {
@@ -56,27 +64,32 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
             ClipboardItem(
               content = "git commit -m 'feat: implement Room database and ClipboardViewModel with Compose LazyColumn'",
               category = "Code",
-              timestamp = System.currentTimeMillis() - 600000
+              timestamp = System.currentTimeMillis() - 600000,
+              isPinned = true
             ),
             ClipboardItem(
               content = "https://developer.android.com/training/data-storage/room",
               category = "Link",
-              timestamp = System.currentTimeMillis() - 3600000
+              timestamp = System.currentTimeMillis() - 3600000,
+              isPinned = true
             ),
             ClipboardItem(
               content = "Meeting agenda: Discuss offline-first Room database migration and search indexing.",
               category = "Note",
-              timestamp = System.currentTimeMillis() - 7200000
+              timestamp = System.currentTimeMillis() - 7200000,
+              isPinned = false
             ),
             ClipboardItem(
               content = "auth-token-prod-2026-xyz-encrypted-key",
               category = "Password",
-              timestamp = System.currentTimeMillis() - 14400000
+              timestamp = System.currentTimeMillis() - 14400000,
+              isPinned = false
             ),
             ClipboardItem(
-              content = "Welcome to Clipboard Vault! You can search clips, filter by category, add new items, and copy with one tap.",
+              content = "Welcome to Clipboard Vault! You can search clips, filter by category, pin important items, swipe to delete, and auto-capture with the background service.",
               category = "General",
-              timestamp = System.currentTimeMillis() - 86400000
+              timestamp = System.currentTimeMillis() - 86400000,
+              isPinned = false
             )
           )
         )
@@ -118,7 +131,12 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
   }
 
   fun setContentInput(text: String) {
-    _uiState.value = _uiState.value.copy(contentInput = text)
+    val autoCat = if (_uiState.value.categoryInput == "General" && text.isNotBlank()) {
+      ClipboardItem.inferCategory(text)
+    } else {
+      _uiState.value.categoryInput
+    }
+    _uiState.value = _uiState.value.copy(contentInput = text, categoryInput = autoCat)
   }
 
   fun setCategoryInput(category: String) {
@@ -127,6 +145,26 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun setAddCardExpanded(expanded: Boolean) {
     _uiState.value = _uiState.value.copy(isAddCardExpanded = expanded)
+  }
+
+  fun toggleMonitoring(context: Context) {
+    val newActive = !_uiState.value.isMonitoringActive
+    if (newActive) {
+      ClipboardMonitorService.start(context)
+      showSnackbar("Clipboard background monitoring started")
+    } else {
+      ClipboardMonitorService.stop(context)
+      showSnackbar("Clipboard background monitoring stopped")
+    }
+    _uiState.value = _uiState.value.copy(isMonitoringActive = newActive)
+  }
+
+  fun togglePin(item: ClipboardItem) {
+    viewModelScope.launch {
+      repository.togglePin(item)
+      val msg = if (!item.isPinned) "Pinned to top" else "Unpinned"
+      showSnackbar(msg)
+    }
   }
 
   fun addOrUpdateClipboardItem(
@@ -143,7 +181,7 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
       if (editing != null) {
         val updated = editing.copy(
           content = content.trim(),
-          category = category.trim().ifBlank { "General" },
+          category = category.trim().ifBlank { ClipboardItem.inferCategory(content) },
           timestamp = System.currentTimeMillis()
         )
         repository.update(updated)
@@ -157,8 +195,9 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
       } else {
         val newItem = ClipboardItem(
           content = content.trim(),
-          category = category.trim().ifBlank { "General" },
-          timestamp = System.currentTimeMillis()
+          category = category.trim().ifBlank { ClipboardItem.inferCategory(content) },
+          timestamp = System.currentTimeMillis(),
+          isPinned = false
         )
         repository.insert(newItem)
         _uiState.value = _uiState.value.copy(
@@ -174,7 +213,45 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
   fun deleteClipboardItem(item: ClipboardItem) {
     viewModelScope.launch {
       repository.delete(item)
-      showSnackbar("Deleted clipboard item")
+      _uiState.value = _uiState.value.copy(
+        lastDeletedItem = item,
+        snackbarMessage = "Item deleted. Swipe action completed."
+      )
+    }
+  }
+
+  fun undoDelete() {
+    val deleted = _uiState.value.lastDeletedItem ?: return
+    viewModelScope.launch {
+      repository.insert(deleted)
+      _uiState.value = _uiState.value.copy(
+        lastDeletedItem = null,
+        snackbarMessage = "Item restored"
+      )
+    }
+  }
+
+  fun copyToSystemClipboard(context: Context, item: ClipboardItem) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    val clip = ClipData.newPlainText("Vault Copied Text", item.content)
+    clipboard?.setPrimaryClip(clip)
+    showSnackbar("Copied to system clipboard")
+  }
+
+  fun pasteFromClipboard(context: Context) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    val clip = clipboard?.primaryClip
+    if (clip != null && clip.itemCount > 0) {
+      val text = clip.getItemAt(0).coerceToText(context)?.toString()
+      if (!text.isNullOrBlank()) {
+        setContentInput(text)
+        setAddCardExpanded(true)
+        showSnackbar("Pasted from system clipboard")
+      } else {
+        showSnackbar("Clipboard is empty")
+      }
+    } else {
+      showSnackbar("Clipboard is empty")
     }
   }
 
@@ -204,3 +281,4 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
     _uiState.value = _uiState.value.copy(snackbarMessage = null)
   }
 }
+
