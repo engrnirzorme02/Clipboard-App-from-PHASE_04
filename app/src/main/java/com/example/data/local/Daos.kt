@@ -54,6 +54,9 @@ interface ClipDao {
   @Query("UPDATE clips SET archived = :archived WHERE id = :id")
   suspend fun setArchived(id: String, archived: Boolean)
 
+  @Query("UPDATE clips SET syncState = :syncState WHERE id = :id")
+  suspend fun updateSyncState(id: String, syncState: com.example.domain.model.SyncState)
+
   @Query("SELECT * FROM clips")
   suspend fun getAllClipsSnapshot(): List<ClipEntity>
 

@@ -26,6 +26,19 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.firebase.CloudSyncState
+import com.example.data.firebase.FirebaseSyncStatus
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
@@ -95,6 +108,7 @@ fun SettingsScreen(
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  val syncStatus by viewModel.firebaseSyncStatus.collectAsStateWithLifecycle()
 
   var showExportDialog by remember { mutableStateOf(false) }
   var exportedJsonText by remember { mutableStateOf("") }
@@ -270,7 +284,202 @@ fun SettingsScreen(
 
     Spacer(modifier = Modifier.height(16.dp))
 
-    // 3. Automated Task Execution Card
+    // 3. Firebase Cloud Auto-Save & Synchronization Card
+    Card(
+      modifier = Modifier
+        .fillMaxWidth()
+        .testTag("firebase_autosave_card"),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+      Column(modifier = Modifier.padding(16.dp)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+              imageVector = Icons.Default.CloudSync,
+              contentDescription = "Firebase Sync",
+              tint = VaultCyan,
+              modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+              Text(
+                text = "Firebase Cloud Auto-Save",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+              )
+              Text(
+                text = "Real-time Cloud Firestore Sync",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+
+          Switch(
+            checked = syncStatus.isAutoSaveEnabled,
+            onCheckedChange = { viewModel.toggleFirebaseAutoSave(it) },
+            colors = SwitchDefaults.colors(
+              checkedThumbColor = VaultCyan,
+              checkedTrackColor = VaultCyan.copy(alpha = 0.3f)
+            ),
+            modifier = Modifier.testTag("firebase_autosave_switch")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Cloud Status Banner
+        val (stateBgColor, stateIcon, stateText) = when (syncStatus.state) {
+          CloudSyncState.SYNCED -> Triple(VaultEmerald, Icons.Default.CloudDone, "Cloud Synchronized")
+          CloudSyncState.SYNCING -> Triple(VaultCyan, Icons.Default.CloudSync, "Syncing to Cloud...")
+          CloudSyncState.DISCONNECTED_LOCAL_FIRST -> Triple(VaultAmber, Icons.Default.CloudQueue, "Local-First Mode (Offline Safe)")
+          CloudSyncState.DISABLED -> Triple(Color.Gray, Icons.Default.CloudOff, "Cloud Sync Paused")
+          CloudSyncState.ERROR -> Triple(VaultRose, Icons.Default.CloudOff, "Sync Notice: Local Fallback Active")
+        }
+
+        Surface(
+          shape = RoundedCornerShape(10.dp),
+          color = stateBgColor.copy(alpha = 0.12f),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Icon(
+              imageVector = stateIcon,
+              contentDescription = null,
+              tint = stateBgColor,
+              modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = stateText,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = stateBgColor
+              )
+              Text(
+                text = "Last Cloud Event: ${syncStatus.formattedLastSync} • ${syncStatus.statusMessage}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Synced Counts Chips
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Text(
+                text = "Clips Synced",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+              Text(
+                text = "${syncStatus.syncedClipsCount}",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+              )
+            }
+          }
+
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Text(
+                text = "Notes Synced",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+              Text(
+                text = "${syncStatus.syncedNotesCount}",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+              )
+            }
+          }
+
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Text(
+                text = "Storage Layer",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+              Text(
+                text = "Firestore",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = VaultCyan
+              )
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Cloud Push / Pull action buttons
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          Button(
+            onClick = { viewModel.pushAllToFirebase() },
+            enabled = uiState.currentRole.canEdit,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = MaterialTheme.colorScheme.primary
+            ),
+            modifier = Modifier
+              .weight(1f)
+              .testTag("push_firebase_button")
+          ) {
+            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Push to Cloud", style = MaterialTheme.typography.labelMedium)
+          }
+
+          OutlinedButton(
+            onClick = { viewModel.pullAllFromFirebase() },
+            enabled = uiState.currentRole.canImport,
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier
+              .weight(1f)
+              .testTag("pull_firebase_button")
+          ) {
+            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Pull Cloud", style = MaterialTheme.typography.labelMedium)
+          }
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    // 4. Automated Task Execution Card
     Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(16.dp),

@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Inventory2
@@ -41,12 +45,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.firebase.CloudSyncState
+import com.example.data.firebase.FirebaseSyncStatus
 import com.example.domain.model.EnvironmentConfig
 import com.example.domain.model.EnvironmentType
 import com.example.domain.model.UserRole
 import com.example.ui.theme.VaultAmber
 import com.example.ui.theme.VaultCyan
 import com.example.ui.theme.VaultEmerald
+import com.example.ui.theme.VaultRose
 import com.example.ui.viewmodel.VaultScreen
 
 @Composable
@@ -55,6 +62,7 @@ fun TopVaultBar(
   clipCount: Int,
   environmentConfig: EnvironmentConfig = EnvironmentConfig.DEV_PROFILE,
   userRole: UserRole = UserRole.ADMIN,
+  firebaseSyncStatus: FirebaseSyncStatus? = null,
   modifier: Modifier = Modifier
 ) {
   val envColor = when (environmentConfig.type) {
@@ -117,28 +125,68 @@ fun TopVaultBar(
         }
       }
 
-      // Environment Profile Badge
-      Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = envColor.copy(alpha = 0.15f),
-        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
       ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-          verticalAlignment = Alignment.CenterVertically
+        // Firebase Cloud Auto-Save Badge
+        if (firebaseSyncStatus != null) {
+          val (cloudIcon, cloudColor, cloudText) = when (firebaseSyncStatus.state) {
+            CloudSyncState.SYNCED -> Triple(Icons.Default.CloudDone, VaultEmerald, "Cloud")
+            CloudSyncState.SYNCING -> Triple(Icons.Default.CloudSync, VaultCyan, "Syncing")
+            CloudSyncState.DISCONNECTED_LOCAL_FIRST -> Triple(Icons.Default.CloudQueue, VaultAmber, "Local")
+            CloudSyncState.DISABLED -> Triple(Icons.Default.CloudOff, Color.Gray, "Off")
+            CloudSyncState.ERROR -> Triple(Icons.Default.CloudOff, VaultRose, "Retry")
+          }
+
+          Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = cloudColor.copy(alpha = 0.15f),
+            modifier = Modifier.clip(RoundedCornerShape(20.dp))
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = cloudIcon,
+                contentDescription = "Cloud Status",
+                tint = cloudColor,
+                modifier = Modifier.size(13.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = cloudText,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                color = cloudColor
+              )
+            }
+          }
+        }
+
+        // Environment Profile Badge
+        Surface(
+          shape = RoundedCornerShape(20.dp),
+          color = envColor.copy(alpha = 0.15f),
+          modifier = Modifier.clip(RoundedCornerShape(20.dp))
         ) {
-          Box(
-            modifier = Modifier
-              .size(6.dp)
-              .clip(CircleShape)
-              .background(envColor)
-          )
-          Spacer(modifier = Modifier.width(5.dp))
-          Text(
-            text = environmentConfig.type.displayName.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
-            color = envColor
-          )
+          Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Box(
+              modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(envColor)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+              text = environmentConfig.type.displayName.uppercase(),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+              color = envColor
+            )
+          }
         }
       }
     }

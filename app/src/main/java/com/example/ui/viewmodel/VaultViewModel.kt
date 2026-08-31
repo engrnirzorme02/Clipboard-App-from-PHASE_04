@@ -3,6 +3,8 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.firebase.FirebaseAutoSaveManager
+import com.example.data.firebase.FirebaseSyncStatus
 import com.example.data.local.AppDatabase
 import com.example.data.repository.BackupRepository
 import com.example.data.repository.ClipRepository
@@ -89,10 +91,17 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
   private val captureUseCase = CaptureClipUseCase(clipRepository)
   private val backupRepository = BackupRepository(clipRepository, noteRepository)
   private val aiService = AiAssistantService()
+  private val firebaseAutoSaveManager = FirebaseAutoSaveManager(
+    context = application,
+    clipRepository = clipRepository,
+    noteRepository = noteRepository,
+    scope = viewModelScope
+  )
 
   private val _uiState = MutableStateFlow(VaultUiState())
   val uiState: StateFlow<VaultUiState> = _uiState.asStateFlow()
 
+  val firebaseSyncStatus: StateFlow<FirebaseSyncStatus> = firebaseAutoSaveManager.syncStatus
   val diagnosticLogs: StateFlow<List<DiagnosticLogEntry>> = DiagnosticLogger.logs
 
   val allClips: StateFlow<List<ClipItem>> = clipRepository.allClips.stateIn(
@@ -245,6 +254,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
       when (result) {
         is CaptureResult.Success -> {
+          firebaseAutoSaveManager.autoSaveClip(result.clip)
           _uiState.value = _uiState.value.copy(
             captureInput = "",
             captureTitle = "",
@@ -253,7 +263,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             formatValidation = DataValidator.inspectAndValidate(""),
             duplicateDetectedClip = null,
             lastCaptureMessage = "Saved locally [${result.clip.shortCode}]",
-            snackbarMessage = "Clip saved to vault [${result.clip.shortCode}]"
+            snackbarMessage = "Clip saved & Auto-Saved to Cloud [${result.clip.shortCode}]"
           )
         }
         is CaptureResult.Duplicate -> {
@@ -324,6 +334,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
     viewModelScope.launch {
       clipRepository.deleteClip(clip.id)
+      firebaseAutoSaveManager.deleteClipFromCloud(clip.id)
       if (_uiState.value.activeClipDetail?.id == clip.id) {
         _uiState.value = _uiState.value.copy(activeClipDetail = null)
       }
@@ -351,13 +362,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
           updatedAt = System.currentTimeMillis()
         )
         clipRepository.updateClip(updated)
+        firebaseAutoSaveManager.autoSaveClip(updated)
         _uiState.value = _uiState.value.copy(activeClipDetail = updated)
         DiagnosticLogger.log(
           severity = LogSeverity.INFO,
           component = LogComponent.STORAGE,
           message = "Updated clip [${existing.shortCode}]"
         )
-        showSnackbar("Updated [${existing.shortCode}]")
+        showSnackbar("Updated & Synced [${existing.shortCode}]")
       }
     }
   }
@@ -375,6 +387,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         sourceClipId = clip.id
       )
       noteRepository.insertNote(newNote)
+      firebaseAutoSaveManager.autoSaveNote(newNote)
       DiagnosticLogger.log(
         severity = LogSeverity.INFO,
         component = LogComponent.STORAGE,
@@ -415,13 +428,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         tags = tags
       )
       noteRepository.insertNote(note)
+      firebaseAutoSaveManager.autoSaveNote(note)
       _uiState.value = _uiState.value.copy(isCreatingNote = false)
       DiagnosticLogger.log(
         severity = LogSeverity.INFO,
         component = LogComponent.STORAGE,
         message = "Created Note: ${note.title}"
       )
-      showSnackbar("Note saved securely")
+      showSnackbar("Note saved & Auto-Saved to Firebase")
     }
   }
 
@@ -438,8 +452,9 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         updatedAt = System.currentTimeMillis()
       )
       noteRepository.updateNote(updated)
+      firebaseAutoSaveManager.autoSaveNote(updated)
       _uiState.value = _uiState.value.copy(activeNoteDetail = updated)
-      showSnackbar("Note updated")
+      showSnackbar("Note updated & Synced")
     }
   }
 
@@ -450,6 +465,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
     viewModelScope.launch {
       noteRepository.deleteNote(note.id)
+      firebaseAutoSaveManager.deleteNoteFromCloud(note.id)
       _uiState.value = _uiState.value.copy(activeNoteDetail = null)
       DiagnosticLogger.log(
         severity = LogSeverity.INFO,
@@ -603,6 +619,28 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         details = "All local clips and notes wiped."
       )
       showSnackbar("All local vault data has been wiped.")
+    }
+  }
+
+  // Firebase Cloud Auto-Save & Sync
+  fun toggleFirebaseAutoSave(enabled: Boolean) {
+    firebaseAutoSaveManager.toggleAutoSave(enabled)
+    showSnackbar(if (enabled) "Firebase Auto-Save Enabled" else "Firebase Auto-Save Paused")
+  }
+
+  fun pushAllToFirebase() {
+    viewModelScope.launch {
+      showSnackbar("Pushing all records to Firebase Cloud...")
+      val (clips, notes) = firebaseAutoSaveManager.syncAllToFirebase()
+      showSnackbar("Successfully pushed $clips clips and $notes notes to Cloud")
+    }
+  }
+
+  fun pullAllFromFirebase() {
+    viewModelScope.launch {
+      showSnackbar("Restoring records from Firebase Cloud...")
+      val (clips, notes) = firebaseAutoSaveManager.pullFromFirebase()
+      showSnackbar("Restored $clips clips and $notes notes from Cloud")
     }
   }
 

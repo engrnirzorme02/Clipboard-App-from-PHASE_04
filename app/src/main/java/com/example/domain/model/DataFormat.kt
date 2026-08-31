@@ -36,6 +36,7 @@ enum class LogComponent {
   AUTOMATION,
   ENVIRONMENT,
   BACKUP,
+  FIREBASE_SYNC,
   UI
 }
 

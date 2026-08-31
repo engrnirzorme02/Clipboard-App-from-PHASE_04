@@ -60,6 +60,10 @@ class ClipRepository(private val clipDao: ClipDao) {
     clipDao.setArchived(id, !currentArchived)
   }
 
+  suspend fun updateSyncState(id: String, syncState: com.example.domain.model.SyncState) {
+    clipDao.updateSyncState(id, syncState)
+  }
+
   suspend fun getAllSnapshot(): List<ClipItem> {
     return clipDao.getAllClipsSnapshot().map { it.toDomain() }
   }

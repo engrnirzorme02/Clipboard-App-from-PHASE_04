@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
         val clipCount by viewModel.clipCount.collectAsStateWithLifecycle()
         val noteCount by viewModel.noteCount.collectAsStateWithLifecycle()
         val diagnosticLogs by viewModel.diagnosticLogs.collectAsStateWithLifecycle()
+        val firebaseSyncStatus by viewModel.firebaseSyncStatus.collectAsStateWithLifecycle()
 
         val snackbarHostState = remember { SnackbarHostState() }
 
@@ -71,7 +72,8 @@ class MainActivity : ComponentActivity() {
               currentScreen = uiState.currentScreen,
               clipCount = clipCount,
               environmentConfig = uiState.environmentConfig,
-              userRole = uiState.currentRole
+              userRole = uiState.currentRole,
+              firebaseSyncStatus = firebaseSyncStatus
             )
           },
           bottomBar = {
