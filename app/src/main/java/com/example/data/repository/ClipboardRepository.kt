@@ -3,8 +3,12 @@ package com.example.data.repository
 import com.example.data.local.ClipboardDao
 import com.example.data.local.ClipboardItem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ClipboardRepository(private val clipboardDao: ClipboardDao) {
+  private val captureMutex = Mutex()
+
   val allClipboardItems: Flow<List<ClipboardItem>> = clipboardDao.getAllClipboardItems()
   val allCategories: Flow<List<String>> = clipboardDao.getAllCategories()
 
@@ -51,11 +55,11 @@ class ClipboardRepository(private val clipboardDao: ClipboardDao) {
     clipboardDao.updatePinStatus(item.id, !item.isPinned)
   }
 
-  suspend fun captureNewClipboardText(text: String, customCategory: String? = null): ClipboardItem {
+  suspend fun captureNewClipboardText(text: String, customCategory: String? = null): ClipboardItem = captureMutex.withLock {
     val trimmed = text.trim()
     val category = customCategory ?: ClipboardItem.inferCategory(trimmed)
     val existing = clipboardDao.getItemByContent(trimmed)
-    return if (existing != null) {
+    if (existing != null) {
       val updated = existing.copy(timestamp = System.currentTimeMillis())
       clipboardDao.updateClipboardItem(updated)
       updated

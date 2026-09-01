@@ -25,14 +25,20 @@ data class ClipboardItem(
 
   companion object {
     private val URL_PATTERN = Pattern.compile(
-      "^(https?|ftp)://[^\n\\s]+$",
+      "^(https?|ftp)://[^\\s]+$",
       Pattern.CASE_INSENSITIVE
     )
     private val EMAIL_PATTERN = Pattern.compile(
       "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$",
       Pattern.CASE_INSENSITIVE
     )
-
+    private val PHONE_PATTERN = Pattern.compile(
+      "^\\+?[0-9\\s\\-\\(\\)]{7,15}$"
+    )
+    private val JWT_PATTERN = Pattern.compile(
+      "^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]*$"
+    )
+    
     fun parseTags(input: String): List<String> {
       if (input.isBlank()) return emptyList()
       return input
@@ -46,13 +52,16 @@ data class ClipboardItem(
       val trimmed = text.trim()
       return when {
         trimmed.isBlank() -> "General"
+        JWT_PATTERN.matcher(trimmed).matches() && trimmed.length > 30 -> "Sensitive"
         URL_PATTERN.matcher(trimmed).matches() || trimmed.startsWith("http://") || trimmed.startsWith("https://") -> "Link"
         EMAIL_PATTERN.matcher(trimmed).matches() -> "Contact"
+        PHONE_PATTERN.matcher(trimmed).matches() -> "Contact"
         trimmed.startsWith("{") && trimmed.endsWith("}") || trimmed.startsWith("[") && trimmed.endsWith("]") -> "Code"
         trimmed.contains("fun ") || trimmed.contains("val ") || trimmed.contains("const ") ||
           trimmed.contains("import ") || trimmed.contains("class ") || trimmed.contains("SELECT ") ||
           trimmed.contains("git ") || trimmed.contains("def ") -> "Code"
-        trimmed.length in 16..64 && !trimmed.contains(" ") && (trimmed.contains("_") || trimmed.contains("-") || trimmed.any { it.isDigit() }) -> "Password"
+        trimmed.length in 16..64 && !trimmed.contains(" ") && (trimmed.startsWith("sk_test_") || trimmed.startsWith("sk_live_") || trimmed.startsWith("ghp_") || trimmed.startsWith("ey")) -> "Sensitive"
+        trimmed.length in 12..64 && !trimmed.contains(" ") && (trimmed.contains("_") || trimmed.contains("-") || trimmed.any { it.isDigit() }) -> "Password"
         trimmed.lines().size > 2 || trimmed.length > 120 -> "Note"
         else -> "General"
       }

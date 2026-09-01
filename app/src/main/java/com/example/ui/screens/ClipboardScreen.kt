@@ -56,6 +56,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,7 +66,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -408,7 +415,7 @@ fun ClipboardScreen(
       }
 
       Text(
-        text = "Swipe to delete",
+        text = "ডিলিট করতে সোয়াইপ করুন (Swipe to delete)",
         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
@@ -434,11 +441,13 @@ fun ClipboardScreen(
           Spacer(modifier = Modifier.height(12.dp))
           Text(
             text = if (uiState.searchQuery.isNotBlank() || uiState.selectedCategory != null)
-              "No clipboard items match your search filter."
+              "কোনো ফলাফল পাওয়া যায়নি (No matches found for your filter)."
             else
-              "No clipboard items saved yet. Turn on Auto-Capture or add one above!",
+              "এখনও কোনো ডেটা সেভ করা হয়নি। Auto-Capture চালু করুন অথবা নতুন আইটেম যোগ করুন!",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
           )
         }
       }
@@ -504,6 +513,13 @@ fun ClipboardScreen(
               ClipboardItemCard(
                 item = item,
                 onCopy = { viewModel.copyToSystemClipboard(context, item) },
+                onShare = {
+                  val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, item.content)
+                  }
+                  context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Item"))
+                },
                 onTogglePin = { viewModel.togglePin(item) },
                 onEdit = { viewModel.startEditing(item) },
                 onDelete = { viewModel.deleteClipboardItem(item) }
@@ -524,16 +540,20 @@ fun ClipboardScreen(
 fun ClipboardItemCard(
   item: ClipboardItem,
   onCopy: () -> Unit,
+  onShare: () -> Unit,
   onTogglePin: () -> Unit,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  var isRevealed by remember { mutableStateOf(false) }
+  val isSensitive = item.category.equals("Sensitive", ignoreCase = true) || item.category.equals("Password", ignoreCase = true)
+
   val categoryColor = when (item.category.lowercase()) {
     "code", "snippets" -> VaultCyan
     "link", "links", "url" -> VaultIndigo
     "notes", "note" -> VaultAmber
-    "password", "passwords", "auth" -> VaultRose
+    "password", "passwords", "auth", "sensitive", "secret" -> VaultRose
     "contact", "email" -> MaterialTheme.colorScheme.tertiary
     else -> VaultEmerald
   }
@@ -622,12 +642,23 @@ fun ClipboardItemCard(
       Spacer(modifier = Modifier.height(8.dp))
 
       // Content Preview
+      val displayText = if (isSensitive && !isRevealed) {
+        "••••••••••••••••••••••••••••••••\n(Sensitive Data - Tap to Reveal)"
+      } else {
+        item.content
+      }
+
       Text(
-        text = item.content,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurface,
+        text = displayText,
+        style = MaterialTheme.typography.bodyMedium.copy(
+          fontFamily = if (isSensitive && !isRevealed) FontFamily.Monospace else FontFamily.Default,
+          color = if (isSensitive && !isRevealed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+        ),
         maxLines = 6,
-        overflow = TextOverflow.Ellipsis
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+          .fillMaxWidth()
+          .clickable(enabled = isSensitive) { isRevealed = !isRevealed }
       )
 
       if (item.tags.isNotEmpty()) {
@@ -678,6 +709,20 @@ fun ClipboardItemCard(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+          IconButton(
+            onClick = onShare,
+            modifier = Modifier
+              .size(36.dp)
+              .testTag("share_button_${item.id}")
+          ) {
+            Icon(
+              imageVector = Icons.Default.Share,
+              contentDescription = "Share Content",
+              tint = MaterialTheme.colorScheme.tertiary,
+              modifier = Modifier.size(18.dp)
+            )
+          }
+
           IconButton(
             onClick = onCopy,
             modifier = Modifier
