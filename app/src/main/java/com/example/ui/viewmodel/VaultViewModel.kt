@@ -80,7 +80,9 @@ data class VaultUiState(
   val selectedSeverityFilter: LogSeverity? = null,
   val diagnosticSearchQuery: String = "",
   val automationSummary: AutomationEngine.AutomationExecutionSummary? = null,
-  val isAutomationRunning: Boolean = false
+  val isAutomationRunning: Boolean = false,
+  val updateStatus: String? = null,
+  val latestApkUrl: String? = null
 )
 
 class VaultViewModel(application: Application) : AndroidViewModel(application) {
@@ -139,6 +141,36 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     started = SharingStarted.WhileSubscribed(5000),
     initialValue = 0
   )
+
+  private val appUpdater = com.example.utils.AppUpdater(application)
+
+  fun checkForUpdates() {
+    viewModelScope.launch {
+      _uiState.value = _uiState.value.copy(updateStatus = "Checking for updates...")
+      when (val result = appUpdater.checkForUpdates()) {
+        is com.example.utils.UpdateResult.UpdateAvailable -> {
+          _uiState.value = _uiState.value.copy(
+            updateStatus = "New version available: v${result.version}",
+            latestApkUrl = result.downloadUrl
+          )
+        }
+        is com.example.utils.UpdateResult.UpToDate -> {
+          _uiState.value = _uiState.value.copy(updateStatus = "App is up to date (v${com.example.BuildConfig.VERSION_NAME})")
+        }
+        is com.example.utils.UpdateResult.Error -> {
+          _uiState.value = _uiState.value.copy(updateStatus = "Error: ${result.message}")
+        }
+      }
+    }
+  }
+
+  fun downloadUpdate() {
+    val url = _uiState.value.latestApkUrl ?: return
+    _uiState.value = _uiState.value.copy(updateStatus = "Downloading update...")
+    appUpdater.downloadAndInstall(url) {
+      _uiState.value = _uiState.value.copy(updateStatus = "Download complete. Launching installer...")
+    }
+  }
 
   init {
     DiagnosticLogger.log(

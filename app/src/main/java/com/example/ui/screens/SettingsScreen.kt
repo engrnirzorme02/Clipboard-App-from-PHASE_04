@@ -148,6 +148,71 @@ fun SettingsScreen(
 
     // 1. Multi-Environment Configuration Card
     Card(
+      modifier = Modifier.fillMaxWidth().testTag("ota_update_card"),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+      Column(modifier = Modifier.padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(
+            text = "App Updates (OTA)",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface
+          )
+          Spacer(modifier = Modifier.weight(1f))
+          Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = MaterialTheme.colorScheme.primaryContainer
+          ) {
+            Text(
+              text = "v${com.example.BuildConfig.VERSION_NAME}",
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.primary,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+          }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        uiState.updateStatus?.let { status ->
+          Text(
+            text = status,
+            style = MaterialTheme.typography.bodySmall,
+            color = com.example.ui.theme.VaultCyan,
+            modifier = Modifier.padding(bottom = 12.dp)
+          )
+        }
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          OutlinedButton(
+            onClick = { viewModel.checkForUpdates() },
+            modifier = Modifier.weight(1f)
+          ) {
+            Text("Check Update")
+          }
+          if (uiState.latestApkUrl != null && (uiState.updateStatus?.contains("New version available") == true)) {
+            Button(
+              onClick = { viewModel.downloadUpdate() },
+              modifier = Modifier.weight(1f),
+              colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.VaultEmerald)
+            ) {
+              Text("Install")
+            }
+          }
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+
+    // 1. Multi-Environment Configuration Card
+    Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(16.dp),
       colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
