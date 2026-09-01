@@ -58,6 +58,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -87,6 +90,13 @@ fun CaptureScreen(
 ) {
   val context = LocalContext.current
   var showTitleField by remember { mutableStateOf(false) }
+
+  val focusRequester = remember { FocusRequester() }
+  LaunchedEffect(Unit) {
+    if (uiState.currentRole.canCapture) {
+      focusRequester.requestFocus()
+    }
+  }
 
   val commonTags = listOf("work", "personal", "code", "link", "todo", "important")
   val isAuditorReadOnly = !uiState.currentRole.canCapture
@@ -216,11 +226,12 @@ fun CaptureScreen(
           OutlinedTextField(
             value = uiState.captureInput,
             onValueChange = { viewModel.updateCaptureInput(it) },
-            placeholder = { Text("Type, dictate, or paste clipboard text here...") },
+            placeholder = { Text("👉 পেস্ট করতে কার্সর রাখুন (Auto-Capture), or type here...") },
             enabled = !isAuditorReadOnly,
             modifier = Modifier
               .fillMaxWidth()
               .height(150.dp)
+              .focusRequester(focusRequester)
               .testTag("capture_text_input"),
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(

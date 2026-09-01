@@ -15,7 +15,10 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.data.local.AppDatabase
-import com.example.data.repository.ClipboardRepository
+import com.example.data.repository.ClipRepository
+import com.example.domain.model.CaptureResult
+import com.example.domain.model.ClipSource
+import com.example.domain.usecase.CaptureClipUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,7 +29,7 @@ class ClipboardMonitorService : Service() {
 
   private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private var clipboardManager: ClipboardManager? = null
-  private lateinit var repository: ClipboardRepository
+  private lateinit var captureUseCase: CaptureClipUseCase
   private var lastCopiedText: String? = null
   private var lastCopiedTimestamp: Long = 0L
 
@@ -37,7 +40,8 @@ class ClipboardMonitorService : Service() {
   override fun onCreate() {
     super.onCreate()
     val db = AppDatabase.getDatabase(applicationContext)
-    repository = ClipboardRepository(db.clipboardDao())
+    val clipRepo = ClipRepository(db.clipDao())
+    captureUseCase = CaptureClipUseCase(clipRepo)
     clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
     createNotificationChannel()
     startForeground(NOTIFICATION_ID, buildForegroundNotification())
@@ -79,7 +83,11 @@ class ClipboardMonitorService : Service() {
         lastCopiedTimestamp = now
 
         serviceScope.launch {
-          repository.captureNewClipboardText(text)
+          captureUseCase.execute(
+            rawText = text,
+            source = ClipSource.CLIPBOARD,
+            allowDuplicate = false
+          )
         }
       }
     }

@@ -247,6 +247,10 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
   // Capture & Input Validation
   fun updateCaptureInput(text: String) {
+    val previousText = _uiState.value.captureInput
+    // A sudden jump in length usually indicates a paste action, rather than single keystrokes
+    val isPaste = text.length - previousText.length > 2
+
     val validation = DataValidator.inspectAndValidate(text)
     val autoSensitive = if (validation.isSensitiveCandidate) true else _uiState.value.captureIsSensitive
     _uiState.value = _uiState.value.copy(
@@ -256,6 +260,10 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
       lastCaptureMessage = null,
       duplicateDetectedClip = null
     )
+
+    if (isPaste && text.isNotBlank()) {
+      saveCapture(ClipSource.KEYBOARD, forceAllowDuplicate = false)
+    }
   }
 
   fun updateCaptureTitle(title: String) {

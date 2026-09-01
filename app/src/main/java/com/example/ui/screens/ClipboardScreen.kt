@@ -59,6 +59,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,6 +93,12 @@ fun ClipboardScreen(
   val context = LocalContext.current
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val filteredItems by viewModel.filteredItems.collectAsStateWithLifecycle()
+
+  val focusRequester = remember { FocusRequester() }
+  LaunchedEffect(Unit) {
+    // Request focus automatically when the screen opens
+    focusRequester.requestFocus()
+  }
 
   Column(
     modifier = modifier
@@ -273,65 +282,28 @@ fun ClipboardScreen(
 
     Spacer(modifier = Modifier.height(10.dp))
 
-    // 4. Quick-Add / Paste / Edit Clipboard Item Card
-    Card(
-      modifier = Modifier
-        .fillMaxWidth()
-        .testTag("add_clipboard_item_card"),
-      shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-    ) {
-      Column(modifier = Modifier.padding(12.dp)) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
+    // 4. Rapid Intake Terminal or Advanced Edit Card
+    if (uiState.editingItem != null) {
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("edit_clipboard_item_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+      ) {
+        Column(modifier = Modifier.padding(12.dp)) {
           Text(
-            text = if (uiState.editingItem != null) "Edit Clipboard Item" else "Add & Capture",
+            text = "Edit Clipboard Item",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary
           )
 
-          if (!uiState.isAddCardExpanded && uiState.editingItem == null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              OutlinedButton(
-                onClick = { viewModel.pasteFromClipboard(context) },
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("paste_system_clipboard_button")
-              ) {
-                Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Paste", style = MaterialTheme.typography.labelMedium)
-              }
-
-              Button(
-                onClick = { viewModel.setAddCardExpanded(true) },
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("expand_add_button")
-              ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("New", style = MaterialTheme.typography.labelMedium)
-              }
-            }
-          }
-        }
-
-        AnimatedVisibility(
-          visible = uiState.isAddCardExpanded || uiState.editingItem != null,
-          enter = fadeIn(),
-          exit = fadeOut()
-        ) {
           Column(modifier = Modifier.padding(top = 10.dp)) {
             OutlinedTextField(
               value = uiState.contentInput,
               onValueChange = { viewModel.setContentInput(it) },
               label = { Text("Clipboard Text Content") },
-              placeholder = { Text("Enter text, code snippet, or link...") },
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("clipboard_content_input"),
+              modifier = Modifier.fillMaxWidth().testTag("clipboard_content_input"),
               shape = RoundedCornerShape(12.dp),
               minLines = 2,
               maxLines = 4
@@ -342,11 +314,8 @@ fun ClipboardScreen(
             OutlinedTextField(
               value = uiState.categoryInput,
               onValueChange = { viewModel.setCategoryInput(it) },
-              label = { Text("Category (Auto-detected or custom)") },
-              placeholder = { Text("General, Code, Link, Note, Password, etc.") },
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("clipboard_category_input"),
+              label = { Text("Category") },
+              modifier = Modifier.fillMaxWidth().testTag("clipboard_category_input"),
               shape = RoundedCornerShape(12.dp),
               singleLine = true
             )
@@ -356,11 +325,8 @@ fun ClipboardScreen(
             OutlinedTextField(
               value = uiState.tagsInput,
               onValueChange = { viewModel.setTagsInput(it) },
-              label = { Text("Custom Tags (comma or space separated)") },
-              placeholder = { Text("e.g. git, android, work, important") },
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("clipboard_tags_input"),
+              label = { Text("Custom Tags (comma separated)") },
+              modifier = Modifier.fillMaxWidth().testTag("clipboard_tags_input"),
               shape = RoundedCornerShape(12.dp),
               singleLine = true
             )
@@ -371,24 +337,51 @@ fun ClipboardScreen(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.End
             ) {
-              OutlinedButton(
-                onClick = { viewModel.cancelEditing() },
-                shape = RoundedCornerShape(10.dp)
-              ) {
+              OutlinedButton(onClick = { viewModel.cancelEditing() }, shape = RoundedCornerShape(10.dp)) {
                 Text("Cancel")
               }
-
               Spacer(modifier = Modifier.width(8.dp))
-
-              Button(
-                onClick = { viewModel.addOrUpdateClipboardItem() },
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("save_clipboard_button")
-              ) {
-                Text(if (uiState.editingItem != null) "Update" else "Save to Vault")
+              Button(onClick = { viewModel.addOrUpdateClipboardItem() }, shape = RoundedCornerShape(10.dp)) {
+                Text("Update")
               }
             }
           }
+        }
+      }
+    } else {
+      // Rapid Intake Terminal
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("rapid_intake_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VaultCyan.copy(alpha = 0.5f))
+      ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+          OutlinedTextField(
+            value = uiState.rapidInput,
+            onValueChange = { viewModel.handleRapidCapture(it) },
+            placeholder = { 
+              Text(
+                "👉 পেস্ট করতে কার্সর রাখুন (Auto-Capture)...",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              ) 
+            },
+            modifier = Modifier
+              .fillMaxWidth()
+              .focusRequester(focusRequester),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedBorderColor = VaultCyan,
+              unfocusedBorderColor = Color.Transparent,
+              focusedContainerColor = MaterialTheme.colorScheme.surface,
+              unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            ),
+            singleLine = false,
+            maxLines = 4
+          )
         }
       }
     }

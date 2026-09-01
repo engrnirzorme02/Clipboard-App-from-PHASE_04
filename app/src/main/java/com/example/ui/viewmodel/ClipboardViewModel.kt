@@ -24,6 +24,7 @@ data class ClipboardUiState(
   val searchQuery: String = "",
   val selectedCategory: String? = null,
   val selectedTag: String? = null,
+  val rapidInput: String = "",
   val contentInput: String = "",
   val categoryInput: String = "General",
   val tagsInput: String = "",
@@ -160,6 +161,26 @@ class ClipboardViewModel(application: Application) : AndroidViewModel(applicatio
     val effectiveTag = if (tag == "All") null else tag
     _selectedTag.value = effectiveTag
     _uiState.value = _uiState.value.copy(selectedTag = effectiveTag)
+  }
+
+  fun handleRapidCapture(text: String) {
+    if (text.isBlank()) {
+      _uiState.value = _uiState.value.copy(rapidInput = text)
+      return
+    }
+
+    val trimmed = text.trim()
+    val existing = allItems.value.find { it.content.trim() == trimmed }
+    
+    viewModelScope.launch {
+      if (existing != null) {
+        showSnackbar("⚠️ Duplicate: Already saved in Vault")
+      } else {
+        repository.captureNewClipboardText(trimmed)
+        showSnackbar("✅ Saved new item to Vault")
+      }
+      _uiState.value = _uiState.value.copy(rapidInput = "")
+    }
   }
 
   fun setContentInput(text: String) {

@@ -6,7 +6,10 @@ import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.example.data.local.AppDatabase
-import com.example.data.repository.ClipboardRepository
+import com.example.data.repository.ClipRepository
+import com.example.domain.model.CaptureResult
+import com.example.domain.model.ClipSource
+import com.example.domain.usecase.CaptureClipUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +23,7 @@ class ClipboardObserver(
 
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private var clipboardManager: ClipboardManager? = null
-  private val repository: ClipboardRepository
+  private val captureUseCase: CaptureClipUseCase
 
   private var lastProcessedText: String? = null
   private var lastTimestamp: Long = 0L
@@ -31,7 +34,8 @@ class ClipboardObserver(
 
   init {
     val db = AppDatabase.getDatabase(context.applicationContext)
-    repository = ClipboardRepository(db.clipboardDao())
+    val clipRepo = ClipRepository(db.clipDao())
+    captureUseCase = CaptureClipUseCase(clipRepo)
     clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
   }
 
@@ -64,8 +68,14 @@ class ClipboardObserver(
         lastTimestamp = now
 
         scope.launch {
-          val saved = repository.captureNewClipboardText(text)
-          onClipCaptured?.invoke(saved.content)
+          val result = captureUseCase.execute(
+            rawText = text,
+            source = ClipSource.CLIPBOARD,
+            allowDuplicate = false
+          )
+          if (result is CaptureResult.Success) {
+            onClipCaptured?.invoke(result.clip.text)
+          }
         }
       }
     }
