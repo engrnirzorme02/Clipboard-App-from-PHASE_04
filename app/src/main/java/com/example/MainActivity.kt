@@ -25,21 +25,18 @@ import com.example.service.ClipboardObserver
 import com.example.ui.components.BottomVaultNavigation
 import com.example.ui.components.TopVaultBar
 import com.example.ui.screens.CaptureScreen
-import com.example.ui.screens.ClipboardScreen
 import com.example.ui.screens.DiagnosticLogsModal
 import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SearchScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.VaultScreen
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.viewmodel.ClipboardViewModel
 import com.example.ui.viewmodel.VaultScreen as ScreenEnum
 import com.example.ui.viewmodel.VaultViewModel
 
 class MainActivity : ComponentActivity() {
 
   private val viewModel: VaultViewModel by viewModels()
-  private val clipboardViewModel: ClipboardViewModel by viewModels()
   private var isShareIntentProcessed = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +45,7 @@ class MainActivity : ComponentActivity() {
 
     val clipboardObserver = ClipboardObserver(this) { capturedText ->
       val preview = if (capturedText.length > 30) "${capturedText.take(30)}..." else capturedText
-      clipboardViewModel.showSnackbar("Auto-captured: \"$preview\"")
+      viewModel.showSnackbar("Auto-captured: \"$preview\"")
     }
     lifecycle.addObserver(clipboardObserver)
 
@@ -57,7 +54,6 @@ class MainActivity : ComponentActivity() {
     setContent {
       MyApplicationTheme {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-        val clipboardUiState by clipboardViewModel.uiState.collectAsStateWithLifecycle()
         val allClips by viewModel.allClips.collectAsStateWithLifecycle()
         val activeClips by viewModel.activeClips.collectAsStateWithLifecycle()
         val archivedClips by viewModel.archivedClips.collectAsStateWithLifecycle()
@@ -69,14 +65,10 @@ class MainActivity : ComponentActivity() {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
-        LaunchedEffect(uiState.snackbarMessage, clipboardUiState.snackbarMessage) {
+        LaunchedEffect(uiState.snackbarMessage) {
           uiState.snackbarMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearSnackbar()
-          }
-          clipboardUiState.snackbarMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            clipboardViewModel.clearSnackbar()
           }
         }
 
@@ -110,11 +102,6 @@ class MainActivity : ComponentActivity() {
               label = "ScreenTransition"
             ) { targetScreen ->
               when (targetScreen) {
-                ScreenEnum.CLIPBOARD -> {
-                  ClipboardScreen(
-                    viewModel = clipboardViewModel
-                  )
-                }
                 ScreenEnum.CAPTURE -> {
                   CaptureScreen(
                     viewModel = viewModel,

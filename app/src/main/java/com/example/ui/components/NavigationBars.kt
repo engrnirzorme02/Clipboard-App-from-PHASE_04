@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Inventory2
@@ -205,9 +207,9 @@ fun BottomVaultNavigation(
     tonalElevation = 6.dp
   ) {
     val items = listOf(
-      Triple(VaultScreen.CLIPBOARD, Icons.Filled.ContentPaste, Icons.Outlined.ContentPaste),
-      Triple(VaultScreen.CAPTURE, Icons.Filled.Search, Icons.Outlined.Search),
       Triple(VaultScreen.VAULT, Icons.Filled.Inventory2, Icons.Outlined.Inventory2),
+      Triple(VaultScreen.CAPTURE, Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
+      Triple(VaultScreen.SEARCH, Icons.Filled.Search, Icons.Outlined.Search),
       Triple(VaultScreen.NOTES, Icons.Filled.EditNote, Icons.Outlined.EditNote),
       Triple(VaultScreen.SETTINGS, Icons.Filled.Settings, Icons.Outlined.Settings)
     )

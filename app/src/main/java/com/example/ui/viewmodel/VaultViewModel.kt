@@ -44,8 +44,7 @@ enum class VaultScreen(val title: String) {
   CAPTURE("Capture"),
   NOTES("Notes"),
   SEARCH("Search"),
-  SETTINGS("Settings"),
-  CLIPBOARD("Clipboard")
+  SETTINGS("Settings")
 }
 
 enum class VaultFilter(val label: String) {
@@ -56,7 +55,7 @@ enum class VaultFilter(val label: String) {
 }
 
 data class VaultUiState(
-  val currentScreen: VaultScreen = VaultScreen.CLIPBOARD,
+  val currentScreen: VaultScreen = VaultScreen.CAPTURE,
   val captureInput: String = "",
   val captureTitle: String = "",
   val captureTags: List<String> = emptyList(),
@@ -334,6 +333,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
         is CaptureResult.Duplicate -> {
           _uiState.value = _uiState.value.copy(
+            captureInput = if (source == ClipSource.KEYBOARD) "" else _uiState.value.captureInput,
             duplicateDetectedClip = result.existingClip,
             lastCaptureMessage = "Duplicate detected: Already saved as [${result.existingClip.shortCode}]"
           )

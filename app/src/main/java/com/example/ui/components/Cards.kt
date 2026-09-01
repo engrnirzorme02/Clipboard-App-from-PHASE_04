@@ -268,13 +268,42 @@ fun ClipCard(
       }
 
       // Content Preview
-      Text(
-        text = clip.text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 3,
-        overflow = TextOverflow.Ellipsis
-      )
+      val isSensitive = clip.sensitivity == SensitivityLevel.SENSITIVE
+      var showSensitiveText by remember { mutableStateOf(false) }
+
+      if (isSensitive && !showSensitiveText) {
+        Surface(
+          shape = RoundedCornerShape(8.dp),
+          color = VaultRose.copy(alpha = 0.1f),
+          modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showSensitiveText = true }
+        ) {
+          Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = VaultRose, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+              text = "•••••••••••••••• (Sensitive Data - Tap to Reveal)",
+              style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+              color = VaultRose
+            )
+          }
+        }
+      } else {
+        Text(
+          text = clip.text,
+          style = MaterialTheme.typography.bodyMedium.copy(
+            fontFamily = if (isSensitive) FontFamily.Monospace else null
+          ),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = if (isSensitive) 10 else 3,
+          overflow = TextOverflow.Ellipsis,
+          modifier = if (isSensitive) Modifier.clickable { showSensitiveText = false } else Modifier
+        )
+      }
 
       // Tags Row
       if (clip.tags.isNotEmpty()) {
