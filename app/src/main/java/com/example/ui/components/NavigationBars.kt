@@ -211,6 +211,7 @@ fun BottomVaultNavigation(
       Triple(VaultScreen.CAPTURE, Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
       Triple(VaultScreen.SEARCH, Icons.Filled.Search, Icons.Outlined.Search),
       Triple(VaultScreen.NOTES, Icons.Filled.EditNote, Icons.Outlined.EditNote),
+      Triple(VaultScreen.AI_CHAT, androidx.compose.material.icons.filled.AutoAwesome, androidx.compose.material.icons.outlined.AutoAwesome),
       Triple(VaultScreen.SETTINGS, Icons.Filled.Settings, Icons.Outlined.Settings)
     )
 

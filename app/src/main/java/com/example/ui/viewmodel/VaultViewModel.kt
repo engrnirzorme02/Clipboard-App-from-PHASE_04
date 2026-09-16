@@ -44,7 +44,8 @@ enum class VaultScreen(val title: String) {
   CAPTURE("Capture"),
   NOTES("Notes"),
   SEARCH("Search"),
-  SETTINGS("Settings")
+  SETTINGS("Settings"),
+  AI_CHAT("Copilot")
 }
 
 enum class VaultFilter(val label: String) {
@@ -82,7 +83,11 @@ data class VaultUiState(
   val automationSummary: AutomationEngine.AutomationExecutionSummary? = null,
   val isAutomationRunning: Boolean = false,
   val updateStatus: String? = null,
-  val latestApkUrl: String? = null
+  val latestApkUrl: String? = null,
+  val chatHistory: List<ChatMessage> = emptyList(),
+  val isChatGenerating: Boolean = false,
+  val isContextAwareChatEnabled: Boolean = false,
+  val activeAiMode: AiMode = AiMode.FAST
 )
 
 class VaultViewModel(application: Application) : AndroidViewModel(application) {
@@ -830,5 +835,76 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
   fun clearSnackbar() {
     _uiState.value = _uiState.value.copy(snackbarMessage = null)
+  }
+
+  // --- AI Chat Capabilities ---
+
+  fun setAiMode(mode: com.example.domain.usecase.AiMode) {
+    _uiState.value = _uiState.value.copy(activeAiMode = mode)
+  }
+
+  fun toggleContextAwareChat(enabled: Boolean) {
+    _uiState.value = _uiState.value.copy(isContextAwareChatEnabled = enabled)
+  }
+
+  fun clearChatHistory() {
+    _uiState.value = _uiState.value.copy(chatHistory = emptyList())
+  }
+
+  fun sendChatMessage(prompt: String) {
+    val apiKey = com.example.BuildConfig.GEMINI_API_KEY
+    if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+      val errMsg = com.example.domain.usecase.ChatMessage("model", "API Key is missing. Please set it in AI Studio Secrets.", true)
+      _uiState.value = _uiState.value.copy(chatHistory = _uiState.value.chatHistory + errMsg)
+      return
+    }
+
+    val userMsg = com.example.domain.usecase.ChatMessage("user", prompt)
+    _uiState.value = _uiState.value.copy(
+      chatHistory = _uiState.value.chatHistory + userMsg,
+      isChatGenerating = true
+    )
+
+    viewModelScope.launch {
+      try {
+        var contextText: String? = null
+        if (_uiState.value.isContextAwareChatEnabled) {
+          // Provide recent clips/notes as context
+          val recentClips = clipRepository.getAllSnapshot().take(5).joinToString("\n") { it.text }
+          contextText = "Recent clipboard entries:\n$recentClips"
+        }
+
+        val mode = _uiState.value.activeAiMode
+        val responseMsg = aiService.generateChatResponse(
+          history = _uiState.value.chatHistory,
+          prompt = prompt,
+          mode = mode,
+          contextText = contextText,
+          apiKey = apiKey
+        )
+
+        var finalMsg = responseMsg
+        if (responseMsg.audioBase64 != null) {
+          // Save Base64 to cacheDir
+          val audioBytes = android.util.Base64.decode(responseMsg.audioBase64, android.util.Base64.DEFAULT)
+          val cacheDir = getApplication<Application>().cacheDir
+          val audioFile = java.io.File(cacheDir, "tts_response_${System.currentTimeMillis()}.mp3")
+          audioFile.writeBytes(audioBytes)
+          
+          finalMsg = responseMsg.copy(audioBase64 = audioFile.absolutePath, text = "TTS Audio Generated \uD83C\uDFB5")
+        }
+
+        _uiState.value = _uiState.value.copy(
+          chatHistory = _uiState.value.chatHistory + finalMsg,
+          isChatGenerating = false
+        )
+      } catch (e: Exception) {
+        val errMsg = com.example.domain.usecase.ChatMessage("model", "Error: ${e.message}", true)
+        _uiState.value = _uiState.value.copy(
+          chatHistory = _uiState.value.chatHistory + errMsg,
+          isChatGenerating = false
+        )
+      }
+    }
   }
 }

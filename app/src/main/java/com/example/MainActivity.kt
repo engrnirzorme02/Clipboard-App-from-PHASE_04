@@ -140,6 +140,12 @@ class MainActivity : ComponentActivity() {
                     noteCount = noteCount
                   )
                 }
+                ScreenEnum.AI_CHAT -> {
+                  com.example.ui.screens.AiScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { viewModel.navigateTo(ScreenEnum.VAULT) }
+                  )
+                }
               }
             }
 
