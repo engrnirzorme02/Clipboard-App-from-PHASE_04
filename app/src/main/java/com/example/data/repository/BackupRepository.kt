@@ -117,6 +117,17 @@ class BackupRepository(
       val clipsArray = root.optJSONArray("clips") ?: JSONArray()
       val notesArray = root.optJSONArray("notes") ?: JSONArray()
 
+      // Verify the integrity checksum written by exportToJsonString().
+      // Legacy backups without a checksum remain importable.
+      // This detects corruption; it is not a cryptographic authenticity signature.
+      if (root.has("checksum")) {
+        val expectedChecksum = root.optString("checksum", "")
+        val actualChecksum = computeChecksum(clipsArray.toString() + notesArray.toString())
+        if (expectedChecksum.isBlank() || !expectedChecksum.equals(actualChecksum, ignoreCase = true)) {
+          return ImportResult.Error("Backup checksum mismatch. The file may be corrupted or modified.")
+        }
+      }
+
       val parsedClips = mutableListOf<ClipItem>()
       for (i in 0 until clipsArray.length()) {
         val obj = clipsArray.getJSONObject(i)
