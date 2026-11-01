@@ -26,10 +26,12 @@ import com.example.domain.model.SyncState
 import com.example.domain.model.UserRole
 import com.example.domain.model.VaultNote
 import com.example.domain.usecase.AiAssistantService
+import com.example.domain.usecase.AiMode
 import com.example.domain.usecase.AiTaskType
 import com.example.domain.usecase.AiTransformResult
 import com.example.domain.usecase.AutomationEngine
 import com.example.domain.usecase.CaptureClipUseCase
+import com.example.domain.usecase.ChatMessage
 import com.example.domain.usecase.DataValidator
 import com.example.domain.usecase.DiagnosticLogger
 import kotlinx.coroutines.flow.MutableStateFlow
