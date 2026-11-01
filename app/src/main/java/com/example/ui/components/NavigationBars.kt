@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Inventory2
@@ -211,7 +213,7 @@ fun BottomVaultNavigation(
       Triple(VaultScreen.CAPTURE, Icons.Filled.AddCircle, Icons.Outlined.AddCircle),
       Triple(VaultScreen.SEARCH, Icons.Filled.Search, Icons.Outlined.Search),
       Triple(VaultScreen.NOTES, Icons.Filled.EditNote, Icons.Outlined.EditNote),
-      Triple(VaultScreen.AI_CHAT, androidx.compose.material.icons.filled.AutoAwesome, androidx.compose.material.icons.outlined.AutoAwesome),
+      Triple(VaultScreen.AI_CHAT, Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
       Triple(VaultScreen.SETTINGS, Icons.Filled.Settings, Icons.Outlined.Settings)
     )
 

@@ -17,3 +17,5 @@ local.properties
 .env
 debug.keystore
 app-debug.apk
+# Standalone verification dependencies and compiled classes
+.verification-cache/
